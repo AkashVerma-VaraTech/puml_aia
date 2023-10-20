@@ -1,0 +1,49 @@
+@startuml AI Assist- Workflow
+actor       User              as user
+boundary    "AIA WebPanel"    as webpanel
+control     "AIA Backend"     as backend
+control     "Auth Provider"   as auth_provider
+control     "AIA DB"          as db
+
+== Initial View Profile ==
+
+user -> webpanel: login
+webpanel -> auth_provider : user credentials
+webpanel <- auth_provider : validates and return landing page if OK
+user <- webpanel: landing page
+
+user -> webpanel : api/profiles/getProfiles
+webpanel -> backend : {host}/profiles (GET)
+webpanel <- backend :  returns all profiles (array of objects) for that user
+user <- webpanel : list of profiles for that respective user
+
+user -> webpanel : api/profiles/getAllProfiles
+webpanel -> backend : {host}/users
+webpanel <- backend : returns all existing users (array of objects) in AIA
+user <- webpanel : returns list of all users(not shown on landing page)
+
+user -> webpanel : api/profiles/getProfileObjectGetUrl?profileId={:profileId}
+webpanel -> backend : {host}/users/${profileId}/picture
+webpanel <- backend : returns the S3 link to view profile picture
+user <- webpanel : triggers the S3 link to view profile pic
+
+
+== Create Profile ==
+
+user -> webpanel : api/profiles/postProfile (click on New Profile Button)
+webpanel -> backend : {host}/profiles (POST)
+backend -> db : if new user-{pk: `u`, sk: `${username}`,sub: sub, username: username,displayName: displayName,color: color,email: user.email }
+backend -> db : create{ pk: `sub/${sub}`, sk: `profiles/${username}`, sub: sub, username: username, displayName: displayName, color: color}
+webpanel <- backend : returns profile body
+user <- webpanel : returns the landing page and call the getprofile APIs again
+
+user -> webpanel : api/profiles/getProfileObjectPutUrl?userId={:userId}
+webpanel -> backend : {host}/profiles/${userId}/picture
+webpanel <- backend : returns the S3 link to put profile picture to S3
+user<-webpanel : triggers the S3 link
+
+
+
+
+
+@enduml

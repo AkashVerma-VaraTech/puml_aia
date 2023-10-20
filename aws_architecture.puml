@@ -1,0 +1,31 @@
+@startuml AI Assist- Workflow
+
+control    "webpanel"   as webpanel
+control    "backend"    as backend
+control    "S3"         as s3
+control    "Textract"  as textract
+
+
+== S3-Upload ==
+
+webpanel -> backend : Uploads a doc to backend 
+webpanel <- backend : returns a presigned URL to upload to S3
+
+webpanel -> s3 : triggers the presigned URL to upload source to S3
+
+==Start Textract Job ==
+
+backend -> textract: provides the S3 path to Textract Client and trigger StartDocumentAnalysisCommand
+
+textract -> backend: returns a job Id
+
+
+== Start Textract Analyse Document ==
+
+backend -> S3 : Gets the PreSigned URL from S3 to get the Textract job link
+
+webpanel -> 
+
+
+
+@endumlTextract Flow

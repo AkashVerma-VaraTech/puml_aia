@@ -1,0 +1,93 @@
+@startuml AI Assist- Workflow
+actor       User              as user
+boundary    "AIA WebPanel"    as webpanel
+control     "AIA Backend"     as backend
+control     "AIA DB"          as db
+control     "AWS"             as aws
+
+== Initial View TaskSpaces Landing Page ==
+
+user -> webpanel: api/trusts/getTrustMemberships
+activate user
+webpanel -> backend : {host}/memberships
+backend -> db : {pk: `sub/${sub}` , sk = `memberships`}
+backend <- db : Returns Array of Objects for memberships
+webpanel <- backend : Returns Array of Objects for memberships
+user <- webpanel: Returns Array of Objects for memberships
+deactivate user
+
+
+user -> webpanel: api/trusts/getTrusts?userId={:userID}
+activate user
+webpanel -> backend : {host}/userTrusts/${userId}
+backend -> db : {pk: `u/${username}` , sk = `trusts`}
+backend <- db : Returns Array of Objects for taskspaces
+webpanel <- backend : Returns Array of Objects for taskspaces
+user <- webpanel: Returns list of taskspaces
+deactivate user
+
+
+==Create TaskSpace==
+
+user -> webpanel: api/trusts/postTrust?userId={userID}
+activate user
+webpanel -> backend : {host}/userTrusts/${userId}
+backend -> db : {pk: `u/${username}` , sk : `trusts/${id}`,..., vapi: ${vapi}}
+backend <- db : Returns the payload if metadata.httpStatusCode = 200
+webpanel <- backend : Returns the payload
+user <- webpanel: Returns the payload
+deactivate user
+
+user -> webpanel: api/trusts/postTrustMember?userId={userId}&trustId={trustId}
+activate user
+webpanel -> backend : {host}/userTrusts/${userId}
+backend -> db : {pk: `u/${username}` , sk : `trusts/${id}`,..., vapi: ${vapi}}
+backend <- db : Returns the payload if metadata.httpStatusCode = 200
+webpanel <- backend : Returns the payload
+user <- webpanel: Returns the payload
+deactivate user
+
+
+
+user -> webpanel: api/trustSources/postTrustSource?userId={userId}&trustId={trustId}
+activate user
+webpanel -> backend : {host}/userTrusts/${userId}/${trustId}/sources
+backend -> db : {pk: `u/${username}/trusts/${trustId}` , sk : `sources/${id}`,...}
+backend <- db : Returns the payload if metadata.httpStatusCode = 200
+webpanel <- backend : Returns the payload
+user <- webpanel: Returns the payload
+deactivate user
+
+user -> webpanel: api/trusts/getTrustObjectGetUrl?userId={userId}&trustId={trustId}
+activate user
+webpanel -> backend : {host}/userTrusts/${userId}/${trustId}/picture
+backend -> webpanel : S3 link to get taskspace photo link
+user <- webpanel: S3 link
+deactivate user
+webpanel -> aws : triggers the S3 link to save the taskpace photo
+
+
+user -> webpanel: api/trustSources/getTrustSourceBodyPutUrl?userId={userId}&trustId={trustId}&sourceId={sourceId}
+activate user
+webpanel -> backend : {host}/userTrusts/${userId}/${trustId}/sources
+backend -> db : create trust source Id{pk:`u/${username}/trusts/${trustId}/sources/${sourceId}`,sk :`versions/${versionId}`,...}
+backend -> db : update trust source version {pk: `u/${username}/trusts/${trustId}` , sk : `sources/${sourceId}`,...}
+webpanel <- backend : Returns the S3 presigned url to put the Source Id to S3
+user <- webpanel: Returns the S3 URl
+deactivate user
+
+webpanel -> aws : Trigger the S3 url to put trust soource object
+
+
+user -> webpanel: api/trustSources/postTrustSourceTextractJob?userId={userId}&trustId={trustId}&sourceId={sourceId}&versionId=1
+activate user
+webpanel -> backend : {host}/userTrusts/${userId}/${trustId}/sources/${sourceId}/versions/${versionId}/textract/AnalyzeDocument
+backend -> db : {pk: u/${username}/trusts/${trustId}/sources/${sourceId}}
+backend <- db : Returns the trust source version information
+backend -> aws: create textract job u/${username}/trusts/${trustId}/sources/${sourceId}/versions/${versionId}
+backend <- aws : Returns the textract job Id
+webpanel <- backend: Returns the payload with indicating start of textract job
+user <-webpanel : Landing page
+deactivate user
+
+@enduml

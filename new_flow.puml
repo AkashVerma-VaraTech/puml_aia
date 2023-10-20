@@ -1,0 +1,56 @@
+@startuml AIA-Inveniam Integration - Workflow
+actor       User       as user
+participant    M2MTaskController         as api
+participant     "M2MApiService" as M2MApiService
+participant     "M2MTaskService" as M2MTaskService
+participant     "UserTrustService" as UserTrustService
+participant     "TrustSourceService" as TrustSourceService
+
+user -> api : POST extract/file/__handler/fdr
+api -> M2MApiService : To createFDRFileExtractionRequst(claim, CreateFDRFileExtractionRequestDTO)
+M2MApiService -> M2MApiService: Get the metadata details from IO
+M2MApiService -> api: Res: Data Saved
+api -> user : Res POST extract/file/__handler/fdr\nPayload: Saved Data
+
+user -> api: GET /task/list?status=New
+api  -> M2MTaskService: To getNewTaskList()
+M2MTaskService -> api: Tasks Data / MetaData
+api -> user: Task Gets listed in queue
+
+user -> api: POST /task/:taskId/pick
+api  -> M2MTaskService: To createUserTask(taskId, dto:UserTrustDTO)
+activate M2MTaskService
+M2MTaskService -> M2MTaskService: To getTaskSourceFile(taskId) : To get source Id
+activate M2MApiService
+M2MTaskService -> M2MApiService: invOrganisationLogin(orgID)
+M2MApiService -> M2MApiService: Get SSO token from AuthProvider
+M2MApiService -> M2MApiService: Get AccessToken token from IO
+M2MTaskService <- M2MApiService: service access token
+M2MTaskService -> M2MTaskService: To getFileMetaData(taskId, access_token): To get the file meta data and fileId
+M2MTaskService -> M2MApiService:invOrganisationLogin() : To get the service token
+M2MApiService -> M2MApiService: To getSSOTokenFromIO() : To get the SSO Token
+M2MApiService -> M2MApiService: To getM2MTokenfromIO() To get the M2M token from Fusion Auth
+M2MApiService -> M2MTaskService: To invOrganisationLogin() : Return the Service Token
+M2MApiService -> M2MTaskService: To getFileMetaData(taskId): Return the Service Token
+deactivate M2MApiService
+
+M2MTaskService -> M2MTaskService: Return the fileId/SourceId To createUserTask()
+
+activate UserTrustService
+M2MTaskService -> UserTrustService: To createTrustFromFDR(dto, fileID)
+UserTrustService -> UserTrustService: To getUserTrust(dto.username, dto.id)(Validates if usertrust already exists or not)
+UserTrustService -> UserTrustService: To getTrustTemplate(dto.trustTemplate)
+UserTrustService -> UserTrustService: To _createUserTrust(dto, 3) To save usertrust data to db
+UserTrustService -> TrustSourceService: To postTrustSourceVersion(getUserTrustSourceParams, postUserTrustSourceBody)
+UserTrustService -> UserTrustService: To putUserTrustTaskspacePhotoLink(dto.username, dto.id) to get the s3 put URL for taskspace photo
+UserTrustService -> UserTrustService: Call the S3 url to upload taskpspace photo uisng Axios
+UserTrustService -> UserTrustService: To get the s3 get URL for taskspace photo
+UserTrustService -> UserTrustService: To getTrustSourceVersionBodyPutUrl(putTrustSourceBody) : To get the S3 put url to update trust source version
+UserTrustService -> UserTrustService: Call the S3 url to save the source version using Axios
+UserTrustService -> TrustSourceService: To startTrustSourceVersionTextractAnalyzeDocument(getTrustSourceVersionBody) To create the textract job
+UserTrustService -> M2MTaskService: Res: { userTrustPhotoLink, textractData, dto }
+deactivate UserTrustService
+M2MTaskService -> api: Res: { userTrustPhotoLink, textractData, dto }
+deactivate M2MTaskService
+api -> user:  Res: { userTrustPhotoLink, textractData, dto }
+@enduml
